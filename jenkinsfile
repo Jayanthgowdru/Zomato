@@ -126,9 +126,7 @@ pipeline {
 
                 script {
 
-                    withDockerRegistry(
-                        credentialsId: 'docker'
-                    ) {
+                    withDockerRegistry(credentialsId: 'docker') {
 
                         sh '''
                             docker tag zomato:latest ${DOCKERHUB_IMAGE}
@@ -193,34 +191,36 @@ pipeline {
         // 13. DEPLOY TO MINIKUBE
         
         stage('Deploy to Minikube') {
-            steps {
+    steps {
+        sh '''
+            scp -o StrictHostKeyChecking=no \
+                k8s/deployment.yaml \
+                k8s/service.yaml \
+                ubuntu@<172.31.36.205>:/home/ubuntu/k8s/
 
-                sh '''
-                    kubectl apply -f k8s/deployment.yaml
-
-                    kubectl apply -f k8s/service.yaml
-
-                    kubectl rollout status deployment/zomato
-                '''
-            }
-        }
+            ssh -o StrictHostKeyChecking=no \
+                ubuntu@<172.31.36.205> \
+                "kubectl apply -f /home/ubuntu/k8s/deployment.yaml && \
+                 kubectl apply -f /home/ubuntu/k8s/service.yaml && \
+                 kubectl rollout status deployment/zomato"
+        '''
+    }
+}
 
         
         // 14. VERIFY DEPLOYMENT
         
         stage('Verify Deployment') {
-            steps {
-
-                sh '''
-                    kubectl get pods
-
-                    kubectl get deployments
-
-                    kubectl get services
-                '''
-            }
-        }
+    steps {
+        sh '''
+            ssh -o StrictHostKeyChecking=no \
+                ubuntu@<172.31.36.205> \
+                "kubectl get pods && \
+                 kubectl get deployments && \
+                 kubectl get services"
+        '''
     }
+}
 
     
     // EMAIL NOTIFICATION
