@@ -1,43 +1,53 @@
 pipeline {
+
     agent any
 
-    
     environment {
+
+        // SonarQube
         SCANNER_HOME = tool 'sonar-scanner'
 
+        // AWS
         AWS_REGION = 'us-east-2'
 
+        // Docker Hub
         DOCKERHUB_IMAGE = 'jayanthgowda6/zomato:latest'
 
+        // AWS ECR
         ECR_REGISTRY = '150105760096.dkr.ecr.us-east-2.amazonaws.com'
         ECR_IMAGE = '150105760096.dkr.ecr.us-east-2.amazonaws.com/zomato-application:latest'
+
+        // Minikube Server
+        MINIKUBE_IP = '172.31.36.205'
+        SSH_KEY = '/var/lib/jenkins/.ssh/Ticketapplication.pem'
     }
 
     stages {
 
-        
         // 1. CLEAN WORKSPACE
-        
+
         stage('Clean Workspace') {
             steps {
                 cleanWs()
             }
         }
 
-        
-        // 2. CHECKOUT FROM YOUR GITHUB
-        
+
+        // 2. GIT CHECKOUT
+
         stage('Git Checkout') {
             steps {
                 git 'https://github.com/Jayanthgowdru/Zomato.git'
             }
         }
 
+
         
         // 3. SONARQUBE ANALYSIS
-        
+     
         stage('SonarQube Analysis') {
             steps {
+
                 withSonarQubeEnv('sonar-server') {
 
                     sh '''
@@ -49,11 +59,13 @@ pipeline {
             }
         }
 
+
         
         // 4. SONARQUBE QUALITY GATE
         
         stage('Code Quality Gate') {
             steps {
+
                 script {
 
                     waitForQualityGate(
@@ -64,37 +76,54 @@ pipeline {
             }
         }
 
-        
+
+       
         // 5. INSTALL NPM DEPENDENCIES
-        
+       
         stage('Install NPM Dependencies') {
-            steps {
-                sh 'npm install'
-            }
-        }
-
-        
-        stage('NPM Security Audit') {
-            steps {
-                sh 'npm audit --audit-level=high || true'
-            }
-        }
-
-        
-        // 7. TRIVY FILE SYSTEM SCAN
-        
-        stage('Trivy File Scan') {
             steps {
 
                 sh '''
-                    trivy --config /dev/null --scanners vuln fs . > trivy.txt
+                    npm install
                 '''
             }
         }
 
+
+        
+        // 6. NPM SECURITY AUDIT
+        
+
+        stage('NPM Security Audit') {
+            steps {
+
+                sh '''
+                    npm audit --audit-level=high || true
+                '''
+            }
+        }
+
+
+       
+        // 7. TRIVY FILE SYSTEM SCAN
+       
+
+        stage('Trivy File Scan') {
+            steps {
+
+                sh '''
+                    trivy --config /dev/null \
+                    --scanners vuln \
+                    fs . > trivy.txt
+                '''
+            }
+        }
+
+
         
         // 8. BUILD DOCKER IMAGE
         
+
         stage('Build Docker Image') {
             steps {
 
@@ -104,15 +133,18 @@ pipeline {
             }
         }
 
+
         
-        // 9. PUSH IMAGE TO DOCKER HUB
-        
+        // 9. PUSH TO DOCKER HUB
+       
         stage('Push to DockerHub') {
             steps {
 
                 script {
 
-                    withDockerRegistry(credentialsId: 'docker') {
+                    withDockerRegistry(
+                        credentialsId: 'docker'
+                    ) {
 
                         sh '''
                             docker tag zomato:latest ${DOCKERHUB_IMAGE}
@@ -124,9 +156,11 @@ pipeline {
             }
         }
 
+
         
         // 10. LOGIN TO AWS ECR
-        
+       
+
         stage('Login to AWS ECR') {
             steps {
 
@@ -140,9 +174,11 @@ pipeline {
             }
         }
 
+
         
         // 11. PUSH IMAGE TO AWS ECR
         
+
         stage('Push to ECR') {
             steps {
 
@@ -154,60 +190,80 @@ pipeline {
             }
         }
 
+
         
-        // 12. DOCKER SCOUT
+        // 12. DOCKER SCOUT IMAGE SCAN
         
+
         stage('Docker Scout Image Scan') {
             steps {
 
-                script {
+                sh '''
+                    docker-scout quickview ${DOCKERHUB_IMAGE} || true
 
-                    sh '''
-                        docker-scout quickview ${DOCKERHUB_IMAGE} || true
+                    docker-scout cves ${DOCKERHUB_IMAGE} || true
 
-                        docker-scout cves ${DOCKERHUB_IMAGE} || true
-
-                        docker-scout recommendations ${DOCKERHUB_IMAGE} || true
-                    '''
-                }
+                    docker-scout recommendations ${DOCKERHUB_IMAGE} || true
+                '''
             }
         }
+
 
         
         // 13. DEPLOY TO MINIKUBE
         
-        stage('Deploy to Minikube') {
-    steps {
-        sh '''
-            scp -o StrictHostKeyChecking=no \
-                k8s/deployment.yaml \
-                k8s/service.yaml \
-                ubuntu@<172.31.36.205>:/home/ubuntu/k8s/
 
-            ssh -o StrictHostKeyChecking=no \
-                ubuntu@<172.31.36.205> \
-                "kubectl apply -f /home/ubuntu/k8s/deployment.yaml && \
-                 kubectl apply -f /home/ubuntu/k8s/service.yaml && \
-                 kubectl rollout status deployment/zomato"
-        '''
-    }
-}
+        stage('Deploy to Minikube') {
+            steps {
+
+                sh '''
+                    echo "Copying Kubernetes files to Minikube server..."
+
+                    scp \
+                    -i ${SSH_KEY} \
+                    -o StrictHostKeyChecking=no \
+                    k8s/deployment.yaml \
+                    k8s/service.yaml \
+                    ubuntu@${MINIKUBE_IP}:/home/ubuntu/k8s/
+
+
+                    echo "Deploying application to Minikube..."
+
+                    ssh \
+                    -i ${SSH_KEY} \
+                    -o StrictHostKeyChecking=no \
+                    ubuntu@${MINIKUBE_IP} \
+                    "kubectl apply -f /home/ubuntu/k8s/deployment.yaml && \
+                     kubectl apply -f /home/ubuntu/k8s/service.yaml && \
+                     kubectl rollout status deployment/zomato"
+                '''
+            }
+        }
+
 
         
         // 14. VERIFY DEPLOYMENT
         
+
         stage('Verify Deployment') {
-    steps {
-        sh '''
-            ssh -o StrictHostKeyChecking=no \
-                ubuntu@<172.31.36.205> \
-                "kubectl get pods && \
-                 kubectl get deployments && \
-                 kubectl get services"
-        '''
+            steps {
+
+                sh '''
+                    echo "Checking Kubernetes deployment..."
+
+                    ssh \
+                    -i ${SSH_KEY} \
+                    -o StrictHostKeyChecking=no \
+                    ubuntu@${MINIKUBE_IP} \
+                    "kubectl get pods && \
+                     kubectl get deployments && \
+                     kubectl get services"
+                '''
+            }
+        }
+
     }
-}
-}
+
 
     
     // EMAIL NOTIFICATION
@@ -217,12 +273,14 @@ pipeline {
         always {
 
             emailext(
+
                 attachLog: true,
 
                 subject: "Zomato CI/CD - ${currentBuild.result}",
 
                 body: """
                     <html>
+
                     <body>
 
                         <h2>Zomato CI/CD Pipeline</h2>
@@ -257,7 +315,13 @@ pipeline {
                             ${env.ECR_IMAGE}
                         </p>
 
+                        <p>
+                            <b>Minikube Server:</b>
+                            ${env.MINIKUBE_IP}
+                        </p>
+
                     </body>
+
                     </html>
                 """,
 
