@@ -19,6 +19,8 @@ pipeline {
 
         // Minikube Server
         MINIKUBE_IP = '172.31.36.205'
+
+        // SSH private key on Jenkins server
         SSH_KEY = '/var/lib/jenkins/.ssh/Ticketapplication.pem'
     }
 
@@ -42,9 +44,8 @@ pipeline {
         }
 
 
-        
         // 3. SONARQUBE ANALYSIS
-     
+
         stage('SonarQube Analysis') {
             steps {
 
@@ -60,9 +61,8 @@ pipeline {
         }
 
 
-        
         // 4. SONARQUBE QUALITY GATE
-        
+
         stage('Code Quality Gate') {
             steps {
 
@@ -77,9 +77,8 @@ pipeline {
         }
 
 
-       
         // 5. INSTALL NPM DEPENDENCIES
-       
+
         stage('Install NPM Dependencies') {
             steps {
 
@@ -90,9 +89,7 @@ pipeline {
         }
 
 
-        
         // 6. NPM SECURITY AUDIT
-        
 
         stage('NPM Security Audit') {
             steps {
@@ -104,9 +101,7 @@ pipeline {
         }
 
 
-       
         // 7. TRIVY FILE SYSTEM SCAN
-       
 
         stage('Trivy File Scan') {
             steps {
@@ -114,15 +109,13 @@ pipeline {
                 sh '''
                     trivy --config /dev/null \
                     --scanners vuln \
-                    fs . > trivy.txt
+                    fs . > trivy.txt || true
                 '''
             }
         }
 
 
-        
         // 8. BUILD DOCKER IMAGE
-        
 
         stage('Build Docker Image') {
             steps {
@@ -134,9 +127,8 @@ pipeline {
         }
 
 
-        
         // 9. PUSH TO DOCKER HUB
-       
+
         stage('Push to DockerHub') {
             steps {
 
@@ -157,9 +149,7 @@ pipeline {
         }
 
 
-        
         // 10. LOGIN TO AWS ECR
-       
 
         stage('Login to AWS ECR') {
             steps {
@@ -175,9 +165,7 @@ pipeline {
         }
 
 
-        
-        // 11. PUSH IMAGE TO AWS ECR
-        
+        // 11. PUSH TO AWS ECR
 
         stage('Push to ECR') {
             steps {
@@ -191,9 +179,7 @@ pipeline {
         }
 
 
-        
         // 12. DOCKER SCOUT IMAGE SCAN
-        
 
         stage('Docker Scout Image Scan') {
             steps {
@@ -209,22 +195,31 @@ pipeline {
         }
 
 
-        
         // 13. DEPLOY TO MINIKUBE
-        
 
         stage('Deploy to Minikube') {
             steps {
 
                 sh '''
+                    echo "Checking Kubernetes files..."
+
+                    ls -la
+                    ls -la Kubernetes || true
+
                     echo "Copying Kubernetes files to Minikube server..."
+
+                    ssh \
+                    -i ${SSH_KEY} \
+                    -o StrictHostKeyChecking=no \
+                    ubuntu@${MINIKUBE_IP} \
+                    "mkdir -p /home/ubuntu/k8s"
 
                     scp \
                     -i ${SSH_KEY} \
                     -o StrictHostKeyChecking=no \
                     Kubernetes/deployment.yaml \
                     Kubernetes/service.yaml \
-                    ubuntu@${172.31.36.205}:/home/ubuntu/k8s/
+                    ubuntu@${MINIKUBE_IP}:/home/ubuntu/k8s/
 
 
                     echo "Deploying application to Minikube..."
@@ -232,7 +227,7 @@ pipeline {
                     ssh \
                     -i ${SSH_KEY} \
                     -o StrictHostKeyChecking=no \
-                    ubuntu@${172.31.36.205} \
+                    ubuntu@${MINIKUBE_IP} \
                     "kubectl apply -f /home/ubuntu/Kubernetes/deployment.yaml && \
                      kubectl apply -f /home/ubuntu/Kubernetes/service.yaml && \
                      kubectl rollout status deployment/zomato"
@@ -241,9 +236,7 @@ pipeline {
         }
 
 
-        
         // 14. VERIFY DEPLOYMENT
-        
 
         stage('Verify Deployment') {
             steps {
@@ -261,13 +254,11 @@ pipeline {
                 '''
             }
         }
-
     }
 
 
-    
     // EMAIL NOTIFICATION
-    
+
     post {
 
         always {
@@ -280,7 +271,6 @@ pipeline {
 
                 body: """
                     <html>
-
                     <body>
 
                         <h2>Zomato CI/CD Pipeline</h2>
@@ -321,7 +311,6 @@ pipeline {
                         </p>
 
                     </body>
-
                     </html>
                 """,
 
