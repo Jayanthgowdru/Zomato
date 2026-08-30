@@ -259,12 +259,12 @@ pipeline {
 
                         <p>
                             <b>Docker Hub:</b>
-                            ${DOCKERHUB_IMAGE}
+                            ${env.DOCKERHUB_IMAGE}
                         </p>
 
                         <p>
                             <b>AWS ECR:</b>
-                            ${ECR_IMAGE}
+                            ${env.ECR_IMAGE}
                         </p>
 
                     </body>
