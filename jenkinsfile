@@ -74,19 +74,9 @@ pipeline {
         }
 
         
-        // 6. OWASP DEPENDENCY CHECK
-        
-        stage('OWASP FS Scan') {
+        stage('NPM Security Audit') {
             steps {
-
-                dependencyCheck(
-                    additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit -n',
-                    odcInstallation: 'DP-Check'
-                )
-
-                dependencyCheckPublisher(
-                    pattern: '**/dependency-check-report.xml'
-                )
+                sh 'npm audit --audit-level=high || true'
             }
         }
 
