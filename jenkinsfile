@@ -228,8 +228,8 @@ pipeline {
                     -i ${SSH_KEY} \
                     -o StrictHostKeyChecking=no \
                     ubuntu@${MINIKUBE_IP} \
-                    "kubectl apply -f /home/ubuntu/Kubernetes/deployment.yaml && \
-                     kubectl apply -f /home/ubuntu/Kubernetes/service.yaml && \
+                    "kubectl apply -f /home/ubuntu/k8s/deployment.yaml && \
+                     kubectl apply -f /home/ubuntu/k8s/service.yaml && \
                      kubectl rollout status deployment/zomato"
                 '''
             }
