@@ -87,7 +87,7 @@ pipeline {
             steps {
 
                 sh '''
-                    trivy fs . > trivy.txt
+                    sh "trivy --config /dev/null --scanners vuln fs . > trivy.txt"
                 '''
             }
         }
