@@ -25,6 +25,6 @@ jobs:
         with:
           aws-region: us-east-2
           audience: sts.amazonaws.com
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::150105760096:role/github-action-role
       - name: Test aws credentials
         run: aws sts get-caller-identity
