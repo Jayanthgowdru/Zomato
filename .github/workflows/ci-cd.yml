@@ -22,6 +22,8 @@ jobs:
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
+        env:
+          ACTIONS_STEP_DEBUG: true
         with:
           aws-region: us-east-2
           audience: sts.amazonaws.com
