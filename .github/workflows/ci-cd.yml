@@ -33,4 +33,4 @@ jobs:
       
       - name: Upload files to S3
         run: |
-          aws s3 cp ./ s3://github-actiontest123 / --recursive
+          aws s3 cp ./ s3://github-actiontest123/ --recursive
