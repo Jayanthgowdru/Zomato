@@ -1,25 +1,27 @@
 name: github-action-oidc-test
 on: 
   push:
-    branch: [aws-oidc-test]
+    branch: 
+      - aws-oidc-test
 
 permissions:
     id-token: write
-    content: read
+    contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
   
-steps:
-  - name: checkout sourcecode
-    uses: action/checkout@v4
+  steps:
+    - name: checkout sourcecode
+      uses: actions/checkout@v4
 
-  - name: Configure AWS Credentials
-    uses: aws-actions/configure-aws-credentials@v4
-    with:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
       aws-region: us-east-2
       audience: sts.amazonaws.com
       role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-  - name: Test aws credentials
-    run: aws sts get-caller-identity
+    - name: Test aws credentials
+      run: aws sts get-caller-identity
+      run: ls
