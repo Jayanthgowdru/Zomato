@@ -30,3 +30,7 @@ jobs:
           role-to-assume: arn:aws:iam::150105760096:role/github-action-role
       - name: Test aws credentials
         run: aws sts get-caller-identity
+      
+      - name: Upload files to S3
+        run: |
+          aws s3 cp ./ s3://github-actiontest123 / --recursive
